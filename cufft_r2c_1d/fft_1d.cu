@@ -2,6 +2,7 @@
 /* Example showing the use of CUFFT for fast 1D-convolution using FFT. */
 
 // includes, system
+#include <time.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,7 +59,7 @@ void runTest(int argc, char **argv)
     // Create plans
 	cufftHandle plan;
 	cufftHandle plan2;
-	checkCudaErrors(cufftPlan1d(&plan, Nx*Ny*Nz, CUFFT_R2C, 1));		checkCudaErrors(cufftExecR2C(plan, x, reinterpret_cast<cufftComplex *>(y)));
+	checkCudaErrors(cufftPlan1d(&plan, Nx*Ny*Nz, CUFFT_C2C, 1));		checkCudaErrors(cufftExecR2C(plan, x, reinterpret_cast<cufftComplex *>(y)));
 	checkCudaErrors(cufftPlan1d(&plan2, Nx*Ny*Nz, CUFFT_C2R, 1));		checkCudaErrors(cufftExecC2R(plan2, reinterpret_cast<cufftComplex *>(y), x));   
     cudaMemcpy(backx.data(), x, backx.size() * sizeof(decltype(backx)::value_type), cudaMemcpyDeviceToHost);
   
@@ -78,6 +79,23 @@ void runTest(int argc, char **argv)
     }
     std::cout << "Maximum error: " << error << "\n";
 	
+	if(0)
+	{
+		int iteration_times = 1000;
+		timespec startTime,stopTime;	
+		double ElapsedMilliSec = 0;
+		double ElapsedNanoSec = 0;
+		clock_gettime(CLOCK_MONOTONIC, &startTime);
+		for(int i = 0;i<iteration_times;i++)
+			rocfft_execute(forward, (void**)&x, (void**)&y, forwardinfo);
+		cudaDeviceSynchronize();
+		clock_gettime(CLOCK_MONOTONIC, &stopTime);
+		double d_startTime = static_cast<double>(startTime.tv_sec)*1e9 + static_cast<double>(startTime.tv_nsec);
+		double d_currentTime = static_cast<double>(stopTime.tv_sec)*1e9 + static_cast<double>(stopTime.tv_nsec);
+		ElapsedNanoSec = d_currentTime - d_startTime;
+		ElapsedMilliSec = ElapsedNanoSec / 1e6;
+		printf("elapsed mill sec = %.3f(ms)\n", ElapsedMilliSec/iteration_times);
+	}
 	
 	//delete cx;
 	//free(backx);
