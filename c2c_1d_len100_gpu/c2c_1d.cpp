@@ -16,6 +16,8 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #define MAX_WORK_GROUP_SIZE 1024
 #define TWO_PI (-6.283185307179586476925286766559)
+#define TWO_PI_FP32 (6.283185307179586476925286766559F)
+#define TWO_PI_FP64 (6.283185307179586476925286766559)
 
 /* radix table: tell the FFT algorithms for size <= 4096 ; required by twiddle, passes, and kernel*/
 struct SpecRecord
@@ -330,31 +332,33 @@ public:
 		size_t radix;
         size_t L  = 1;
         size_t nt = 0;
+		size_t idxcnt = 0;
         for(std::vector<size_t>::const_iterator i = radices.begin(); i != radices.end(); i++)
         {
             radix = *i;
             L *= radix;
 			
-			//printf("radix = %zu, L = %zu\n", radix, L);
+			printf("radix = %zu, L = %zu\n", radix, L);
 
             // Twiddle factors
             for(size_t k = 0; k < (L / radix); k++)
             {
                 double theta = TWO_PI * (k) / (L);
-				//printf("	[k/L] = [%zu/%zu], theta = %.3f\n", k, L, theta);
+				printf("	[k/L] = [%zu/%zu], theta = %.3f\n", k, L, theta);
 				
 				{
 					size_t j = 0;
 					double c = cos((j)*theta);
 					double s = sin ((j)*theta);
-					//printf("		j = %zu, alph = %.3f, c = %.3f, s = %.3f\n", j, j*theta, c,s);
+					printf("		j = %zu, alph = %.3f, c = %.3f, s = %.3f\n", j, j*theta, c,s);
 				}
 					
                 for(size_t j = 1; j < radix; j++)
                 {
                     double c = cos((j)*theta);
                     double s = sin ((j)*theta);
-					//printf("		j = %zu, alph = %.3f, c = %.3f, s = %.3f\n", j, j*theta, c,s);
+					printf("[%zu]		j = %zu, alph = %.3f, c = %.3f, s = %.3f\n", idxcnt, j, j*theta, c,s);
+					idxcnt++;
 
                     wc[nt].x = c;
                     wc[nt].y = s;					
@@ -427,7 +431,9 @@ __device__ void FwdRad10B1(float2* R0, float2* R1, float2* R2, float2* R3, float
     (*R8).y = TI6 - (-C5QB * TR7 - C5QA * TI7);
     (*R9).y = TI8 - (-C5QD * TR9 - C5QE * TI9);
 }
-__device__ void FwdPass0_len100(const float2 *twiddles, const size_t stride_in, const size_t stride_out, unsigned int rw, unsigned int b, unsigned int me, unsigned int inOffset, unsigned int outOffset, 
+__device__ void FwdPass0_len100(const float2 *twiddles, 
+																const size_t stride_in, const size_t stride_out, 
+																unsigned int rw, unsigned int b, unsigned int me, unsigned int inOffset, unsigned int outOffset, 
 																float2 *bufIn, 
 																float *bufOutRe, float*bufOutIm, 
 																float2 *R0, float2 *R1, float2 *R2, float2 *R3, float2 *R4, float2 *R5, float2 *R6, float2 *R7, float2 *R8, float2 *R9)
@@ -500,110 +506,139 @@ __device__ void FwdPass0_len100(const float2 *twiddles, const size_t stride_in, 
 	
 	__syncthreads();
 }
-__device__ void FwdPass1_len100(const float2  *twiddles, const size_t stride_in, const size_t stride_out, unsigned int rw, unsigned int b, unsigned int me, unsigned int inOffset, unsigned int outOffset, float *bufInRe, float *bufInIm, float2  *bufOut, 
+__device__ void FwdPass1_len100(const float2  *twiddles, 
+																const size_t stride_in, const size_t stride_out, 
+																unsigned int rw, unsigned int b, unsigned int me, unsigned int inOffset, unsigned int outOffset, 
+																float *bufInRe, float *bufInIm, 
+																float2  *bufOut, 
 																float2  *R0, float2  *R1, float2  *R2, float2  *R3, float2  *R4, float2  *R5, float2  *R6, float2  *R7, float2  *R8, float2  *R9)
 {
 	{
-		float2  W = twiddles[9 + 9*((1*me + 0)%10) + 0];
+		//float2  W;
 		float TR, TI;
 		float wx, wy, rx, ry;
-		wx = W.x; wy = W.y;
+		
+		double phase;
+		float phase_fp;
+		uint32_t k = me;//j=Wn;
+		uint32_t L = 100;
+
+		 //float2 W1;// = twiddles[9 + 9*((1*me + 0)%10) + 0];
+		 //float2 W2;// = twiddles[9 + 9*((1*me + 0)%10) + 1];
+		 //float2 W3;// = twiddles[9 + 9*((1*me + 0)%10) + 2];
+		 //float2 W4;// = twiddles[9 + 9*((1*me + 0)%10) + 3];
+		 //float2 W5;// = twiddles[9 + 9*((1*me + 0)%10) + 4];
+		 //float2 W6;// = twiddles[9 + 9*((1*me + 0)%10) + 5];
+		 //float2 W7;// = twiddles[9 + 9*((1*me + 0)%10) + 6];
+		 //float2 W8;// = twiddles[9 + 9*((1*me + 0)%10) + 7];
+		 //float2 W9;// = twiddles[9 + 9*((1*me + 0)%10) + 8];
+
+		phase = -1.0/L * 1 * k;
+		phase_fp = (float)(phase);
+		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		//wx = cosf(float(phase * TWO_PI_FP64)); 
+		//wy = sinf(float(phase * TWO_PI_FP64)); 
+		float2 W1 = twiddles[9 + 9*((1*me + 0)%10) + 0];
+		wx = W1.x; wy = W1.y;
 		rx = (*R1).x; ry = (*R1).y;
 		TR = wx * rx - wy * ry;
 		TI = wy * rx + wx * ry;
 		(*R1).x = TR;
 		(*R1).y = TI;
-	}
-
-	{
-		float2  W = twiddles[9 + 9*((1*me + 0)%10) + 1];
-		float  TR, TI;
-		float wx, wy, rx, ry;
-		wx = W.x; wy = W.y;
+		
+		phase = -1.0/L * 2 * k;
+		phase_fp = (float)(phase);
+		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		//wx = cosf(float(phase * TWO_PI_FP64)); 
+		//wy = sinf(float(phase * TWO_PI_FP64)); 
+		float2 W2 = twiddles[9 + 9*((1*me + 0)%10) + 1];
+		wx = W2.x; wy = W2.y;
 		rx = (*R2).x; ry = (*R2).y;
 		TR = wx * rx - wy * ry;
 		TI = wy * rx + wx * ry;
 		(*R2).x = TR;
 		(*R2).y = TI;
-	}
-
-	{
-		float2  W = twiddles[9 + 9*((1*me + 0)%10) + 2];
-		float  TR, TI;
-		float wx, wy, rx, ry;
-		wx = W.x; wy = W.y;
+		
+		phase = -1.0/L * 3 * k;
+		phase_fp = (float)(phase);
+		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		float2 W3 = twiddles[9 + 9*((1*me + 0)%10) + 2];
+		wx = W3.x; wy = W3.y;
 		rx = (*R3).x; ry = (*R3).y;
 		TR = wx * rx - wy * ry;
 		TI = wy * rx + wx * ry;
 		(*R3).x = TR;
 		(*R3).y = TI;
-	}
-
-	{
-		float2  W = twiddles[9 + 9*((1*me + 0)%10) + 3];
-		float  TR, TI;
-		float wx, wy, rx, ry;
-		wx = W.x; wy = W.y;
+		
+		phase = -1.0/L * 4 * k;
+		phase_fp = (float)(phase);
+		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		float2 W4 = twiddles[9 + 9*((1*me + 0)%10) + 3];
+		wx = W4.x; wy = W4.y;
 		rx = (*R4).x; ry = (*R4).y;
 		TR = wx * rx - wy * ry;
 		TI = wy * rx + wx * ry;
 		(*R4).x = TR;
 		(*R4).y = TI;
-	}
-
-	{
-		float2  W = twiddles[9 + 9*((1*me + 0)%10) + 4];
-		float  TR, TI;
-		float wx, wy, rx, ry;
-		wx = W.x; wy = W.y;
+		
+		phase = -1.0/L * 5 * k;
+		phase_fp = (float)(phase);
+		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		float2 W5 = twiddles[9 + 9*((1*me + 0)%10) + 4];
+		wx = W5.x; wy = W5.y;
 		rx = (*R5).x; ry = (*R5).y;
 		TR = wx * rx - wy * ry;
 		TI = wy * rx + wx * ry;
 		(*R5).x = TR;
 		(*R5).y = TI;
-	}
-
-	{
-		float2  W = twiddles[9 + 9*((1*me + 0)%10) + 5];
-		float  TR, TI;
-		float wx, wy, rx, ry;
-		wx = W.x; wy = W.y;
+		
+		phase = -1.0/L * 6 * k;
+		phase_fp = (float)(phase);
+		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		float2 W6 = twiddles[9 + 9*((1*me + 0)%10) + 5];
+		wx = W6.x; wy = W6.y;
 		rx = (*R6).x; ry = (*R6).y;
 		TR = wx * rx - wy * ry;
 		TI = wy * rx + wx * ry;
 		(*R6).x = TR;
 		(*R6).y = TI;
-	}
-
-	{
-		float2  W = twiddles[9 + 9*((1*me + 0)%10) + 6];
-		float  TR, TI;
-		float wx, wy, rx, ry;
-		wx = W.x; wy = W.y;
+		
+		phase = -1.0/L * 7 * k;
+		phase_fp = (float)(phase);
+		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		float2 W7 = twiddles[9 + 9*((1*me + 0)%10) + 6];
+		wx = W7.x; wy = W7.y;
 		rx = (*R7).x; ry = (*R7).y;
 		TR = wx * rx - wy * ry;
 		TI = wy * rx + wx * ry;
 		(*R7).x = TR;
 		(*R7).y = TI;
-	}
-
-	{
-		float2  W = twiddles[9 + 9*((1*me + 0)%10) + 7];
-		float  TR, TI;
-		float wx, wy, rx, ry;
-		wx = W.x; wy = W.y;
+		
+		phase = -1.0/L * 8 * k;
+		phase_fp = (float)(phase);
+		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		float2 W8 = twiddles[9 + 9*((1*me + 0)%10) + 7];
+		wx = W8.x; wy = W8.y;
 		rx = (*R8).x; ry = (*R8).y;
 		TR = wx * rx - wy * ry;
 		TI = wy * rx + wx * ry;
 		(*R8).x = TR;
 		(*R8).y = TI;
-	}
-
-	{
-		float2  W = twiddles[9 + 9*((1*me + 0)%10) + 8];
-		float  TR, TI;
-		float wx, wy, rx, ry;
-		wx = W.x; wy = W.y;
+		
+		phase = -1.0/L * 9 * k;
+		phase_fp = (float)(phase);
+		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		float2 W9 = twiddles[9 + 9*((1*me + 0)%10) + 8];
+		wx = W9.x; wy = W9.y;
 		rx = (*R9).x; ry = (*R9).y;
 		TR = wx * rx - wy * ry;
 		TI = wy * rx + wx * ry;
@@ -611,11 +646,11 @@ __device__ void FwdPass1_len100(const float2  *twiddles, const size_t stride_in,
 		(*R9).y = TI;
 	}
 
-	FwdRad10B1(R0, R1, R2, R3, R4, R5, R6, R7, R8, R9);
+	FwdRad10B1(R0, R1, R2, R3, R4, R5, R6, R7, R8, R9);	
 
 	if(rw)
 	{
-		bufOut[outOffset + ( 1*me + 0 + 0 )*stride_out] = (*R0);
+		bufOut[outOffset + ( 1*me + 0 + 0  )*stride_out] = (*R0);
 		bufOut[outOffset + ( 1*me + 0 + 10 )*stride_out] = (*R1);
 		bufOut[outOffset + ( 1*me + 0 + 20 )*stride_out] = (*R2);
 		bufOut[outOffset + ( 1*me + 0 + 30 )*stride_out] = (*R3);
@@ -625,14 +660,18 @@ __device__ void FwdPass1_len100(const float2  *twiddles, const size_t stride_in,
 		bufOut[outOffset + ( 1*me + 0 + 70 )*stride_out] = (*R7);
 		bufOut[outOffset + ( 1*me + 0 + 80 )*stride_out] = (*R8);
 		bufOut[outOffset + ( 1*me + 0 + 90 )*stride_out] = (*R9);
-	}
+	}	
 }
 
-__device__ void fwd_len100_device(const float2  *twiddles, const size_t stride_in, const size_t stride_out, unsigned int rw, unsigned int b, unsigned int me, unsigned int ldsOffset, float2  *lwbIn, float2  *lwbOut, float  *lds)
+__device__ void fwd_len100_device(const float2  *twiddles, 
+																const size_t stride_in, const size_t stride_out, 
+																unsigned int rw, unsigned int b, unsigned int me, unsigned int ldsOffset, 
+																float2  *lwbIn, float2  *lwbOut, 
+																float  *lds)
 {
 	float2  R0, R1, R2, R3, R4, R5, R6, R7, R8, R9;
-	FwdPass0_len100(twiddles, stride_in, stride_out, rw, b, me, 0, ldsOffset,  lwbIn, lds, lds, &R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9);
-	FwdPass1_len100(twiddles, stride_in, stride_out, rw, b, me, ldsOffset, 0, lds, lds,  lwbOut, &R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9);
+	FwdPass0_len100(twiddles, stride_in, stride_out,       rw, b, me, 0, ldsOffset,     lwbIn, lds, lds,         &R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9);
+	FwdPass1_len100(twiddles, stride_in, stride_out,       rw, b, me, ldsOffset, 0,     lds, lds,  lwbOut,      &R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9);
 }
 __global__ void fft_fwd_op_len100( const float2  * twiddles, float2  * gbIn, float2  * gbOut)
 {
@@ -690,7 +729,7 @@ __global__ void fft_fwd_op_len100( const float2  * twiddles, float2  * gbIn, flo
 	lwbIn = gbIn + iOffset;
 	lwbOut = gbOut + oOffset;
 
-	fwd_len100_device(twiddles, stride_in[0], stride_out[0],  rw, b, me%10, (me/10)*100, lwbIn, lwbOut, lds);
+	fwd_len100_device(twiddles, stride_in[0], stride_out[0],    rw, b, me%10, (me/10)*100,    lwbIn, lwbOut, lds);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -849,12 +888,12 @@ int main(int argc, char* argv[])
 		float diff = diffx + diffy;
 		if(diff > errormy)
 			errormy = diff;
-		if(diff > 1.0f)
+		/*if(diff > 1.0f)
 		{
 			std::cout << "[" << i << "]";
 			std::cout << real(cy[i]) << ", " << imag(cy[i]) << ";\t";
 			std::cout << real(mycy[i]) << ", " << imag(mycy[i]) << "\n";
-		}
+		}*/
 	}
 	std::cout << "Maximum error: " << errormy << "\n";
 	return 0;
