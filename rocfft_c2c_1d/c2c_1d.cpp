@@ -10,27 +10,29 @@
 #include "rocfft.h"
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#define TEST_LENGTH (100)
-
 int main(int argc, char* argv[])
 {	
 	printf("\n***************************************************\n");
 	std::cout << "rocFFT complex 1d FFT example";
 	printf("\n***************************************************\n");
 
-	// The problem size
-	const size_t Nx = (argc < 2) ? TEST_LENGTH : atoi(argv[1]);
-	const size_t batch = 1;
-	const size_t dimension = 1;
-	std::cout << "Nx: " << Nx  << std::endl;
+    const size_t Nx = (argc < 2) ? 100 : atoi(argv[1]);
+    const size_t Batch = (argc < 3) ? 100 : atoi(argv[2]);
+	const size_t Dimension = 1;
+    const unsigned int IsProf = (argc < 4) ? 0 : atoi(argv[3]);
+	printf("N = %zu, Batch = %zu, IsProf = %d\n", Nx, Batch, IsProf);
 
-	std::vector<std::complex<float>> cx(Nx*batch);
-	std::vector<std::complex<float>> cy(Nx*batch);	
+	std::vector<std::complex<float>> cx(Nx*Batch);
+	std::vector<std::complex<float>> cy(Nx*Batch);	
     std::vector<std::complex<float>> backx(cx.size());
-	for(size_t i = 0; i < Nx; ++i)
-	{
-		cx[i] = std::complex<float>(1.0f*i, -0.1f*i);
-		cy[i] = std::complex<float>(0,0);
+    for(size_t i = 0; i < Batch; ++i)
+    {
+		for(size_t k = 0; k < Nx; ++k)
+		{
+			const size_t pos = i * Nx + k;
+			cx[i] = std::complex<float>(1.0f*i, -0.1f*i);
+			cy[i] = std::complex<float>(0,0);
+		}
 	}
 	//std::cout << "Input:\n";
 	//for(size_t i = 0; i < Nx; ++i)
@@ -40,8 +42,6 @@ int main(int argc, char* argv[])
 	// Create HIP device objects:
 	std::complex<float>* x = NULL;
 	std::complex<float>* y = NULL;
-	size_t malloc_size = cx.size() * sizeof(decltype(cx)::value_type);
-	printf("hipMalloc size = %.3f(KB)\n",malloc_size / 1024.0);
 	hipMalloc(&x, cx.size() * sizeof(decltype(cx)::value_type));
 	hipMalloc(&y, cy.size() * sizeof(decltype(cy)::value_type));
 	hipMemcpy(x, cx.data(), cx.size() * sizeof(decltype(cx)::value_type), hipMemcpyHostToDevice);
@@ -58,9 +58,9 @@ int main(int argc, char* argv[])
                                 rocfft_placement_notinplace,
                                 rocfft_transform_type_complex_forward,
                                 rocfft_precision_single,
-                                dimension,
+                                Dimension,
                                 lengths,
-                                batch,
+                                Batch,
                                 NULL);
 	assert(status == rocfft_status_success);
 
@@ -79,38 +79,18 @@ int main(int argc, char* argv[])
 	//std::cout << "Output:\n";
 	//for(size_t i = 0; i < Nx; ++i)
 	//	std::cout << real(cy[i]) << ", " << imag(cy[i]) << "\n";
-	
-	if(0)
-	{
-		int iteration_times = 1000;
-		timespec startTime,stopTime;	
-		double ElapsedMilliSec = 0;
-		double ElapsedNanoSec = 0;
-		clock_gettime(CLOCK_MONOTONIC, &startTime);
-		for(int i = 0;i<iteration_times;i++)
-			rocfft_execute(forward, (void**)&x, (void**)&y, forwardinfo);
-		hipDeviceSynchronize();
-		clock_gettime(CLOCK_MONOTONIC, &stopTime);
-		double d_startTime = static_cast<double>(startTime.tv_sec)*1e9 + static_cast<double>(startTime.tv_nsec);
-		double d_currentTime = static_cast<double>(stopTime.tv_sec)*1e9 + static_cast<double>(stopTime.tv_nsec);
-		ElapsedNanoSec = d_currentTime - d_startTime;
-		ElapsedMilliSec = ElapsedNanoSec / 1e6;
-		printf("elapsed mill sec = %.3f(ms)\n", ElapsedMilliSec/iteration_times);
-	}
-	//return 0;
-	std::cout << "\n";	
-	
+
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	std::cout << "Transformed back:\n";
+	std::cout << "Transformed Inverse:\n";
 	// Create plans
 	rocfft_plan backward = NULL;
 	status = rocfft_plan_create(&backward,
                                 rocfft_placement_notinplace,
                                 rocfft_transform_type_complex_inverse,
                                 rocfft_precision_single,
-                                dimension,
+                                Dimension,
                                 lengths,
-                                batch,
+                                Batch,
                                 NULL);
 	assert(status == rocfft_status_success);
 
@@ -129,36 +109,63 @@ int main(int argc, char* argv[])
 	//std::cout << "Output:\n";
 	//for(size_t i = 0; i < Nx; ++i)
 	//	std::cout << real(backx[i])/Nx << ", " << imag(backx[i])/Nx << "\n";
+	
+	float error = 0.0f;
+    for(size_t i = 0; i < Batch; i++)
+    {
+		for(size_t k = 0; k < Nx; k++)
+		{
+			const size_t pos = i * Nx + k;
+			double diffx = std::abs(real(backx[pos]) / (Nx) - real(cx[pos]));
+			double diffy = std::abs(imag(backx[pos]) / (Nx) - imag(cx[pos]));
+			double diff = diffx + diffy;
+			
+			if(diff > error)
+				error = diff;
+		}
+	}
+	std::cout << "Maximum error: " << error << "\n";
+	
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	if(0)
+	if(IsProf > 0)
 	{
 		int iteration_times = 1000;
-		timespec startTime,stopTime;	
 		double ElapsedMilliSec = 0;
 		double ElapsedNanoSec = 0;
+		double d_startTime;
+		double d_currentTime;
+		timespec startTime,stopTime;
+		
+		ElapsedMilliSec = 0;
+		ElapsedNanoSec = 0;
+		clock_gettime(CLOCK_MONOTONIC, &startTime);
+		for(int i = 0;i<iteration_times;i++)
+			rocfft_execute(forward, (void**)&x, (void**)&y, forwardinfo);
+		hipDeviceSynchronize();
+		clock_gettime(CLOCK_MONOTONIC, &stopTime);
+		d_startTime = static_cast<double>(startTime.tv_sec)*1e9 + static_cast<double>(startTime.tv_nsec);
+		d_currentTime = static_cast<double>(stopTime.tv_sec)*1e9 + static_cast<double>(stopTime.tv_nsec);
+		ElapsedNanoSec = d_currentTime - d_startTime;
+		ElapsedMilliSec = ElapsedNanoSec / 1e6;
+		printf("Forward elapsed mill sec = %.3f(ms)\n", ElapsedMilliSec/iteration_times);
+			
+		ElapsedMilliSec = 0;
+		ElapsedNanoSec = 0;
 		clock_gettime(CLOCK_MONOTONIC, &startTime);
 		for(int i = 0;i<iteration_times;i++)
 			rocfft_execute(backward, (void**)&y, (void**)&x, backwardinfo);
 		hipDeviceSynchronize();
 		clock_gettime(CLOCK_MONOTONIC, &stopTime);
-		double d_startTime = static_cast<double>(startTime.tv_sec)*1e9 + static_cast<double>(startTime.tv_nsec);
-		double d_currentTime = static_cast<double>(stopTime.tv_sec)*1e9 + static_cast<double>(stopTime.tv_nsec);
+		d_startTime = static_cast<double>(startTime.tv_sec)*1e9 + static_cast<double>(startTime.tv_nsec);
+		d_currentTime = static_cast<double>(stopTime.tv_sec)*1e9 + static_cast<double>(stopTime.tv_nsec);
 		ElapsedNanoSec = d_currentTime - d_startTime;
 		ElapsedMilliSec = ElapsedNanoSec / 1e6;
-		printf("elapsed mill sec = %.3f(ms)\n", ElapsedMilliSec/iteration_times);
+		printf("Inverse elapsed mill sec = %.3f(ms)\n", ElapsedMilliSec/iteration_times);
 	}
-	//return 0;
 	std::cout << "\n";	
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	float error = 0.0f;
-	for(size_t i = 0; i < Nx; i++)
-	{
-		float diff = std::abs(real(backx[i]) / Nx - real(cx[i]));
-		if(diff > error)
-			error = diff;
-	}
-	std::cout << "Maximum error: " << error << "\n";	
 	
 	hipFree(x);
 	hipFree(y);

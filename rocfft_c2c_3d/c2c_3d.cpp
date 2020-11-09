@@ -24,9 +24,9 @@ int main(int argc, char* argv[])
 	const size_t Dimension = 3;
 	printf("Nx = %zu, Ny = %zu, Nz = %zu, IsProf = %d\n", Nx, Ny, Nz, IsProf);
 
-	std::vector<float> cx(Nx*Ny*Nz*Batch);
+	std::vector<std::complex<float>> cx(Nx*Ny*Nz*Batch);
 	std::vector<std::complex<float>> cy(Nx*Ny*Nz*Batch);	
-    std::vector<float> backx(cx.size());
+    std::vector<std::complex<float>> backx(cx.size());
 	for(size_t i = 0; i < Nx; ++i)
 	{
 		for(size_t j = 0; j < Ny; ++j)
@@ -34,8 +34,8 @@ int main(int argc, char* argv[])
 			for(size_t k = 0; k < Nz; ++k)
 			{
 				const size_t pos = i * Ny * Nz + j * Nz + k;
-				cx[pos] = 1.0f*(i+j+k);
-				cy[pos] = 0;
+				cx[pos] = std::complex<float>(1.0f*i, -0.1f*i);
+				cy[pos] = std::complex<float>(0,0);
 			}
 		}
 	}
@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
 	rocfft_plan forward = NULL;
 	status = rocfft_plan_create(&forward,
                                 rocfft_placement_notinplace,
-                                rocfft_transform_type_real_forward,
+                                rocfft_transform_type_complex_forward,
                                 rocfft_precision_single,
                                 Dimension,
                                 lengths,
@@ -91,7 +91,7 @@ int main(int argc, char* argv[])
 	rocfft_plan backward = NULL;
 	status = rocfft_plan_create(&backward,
                                 rocfft_placement_notinplace,
-                                rocfft_transform_type_real_inverse,
+                                rocfft_transform_type_complex_inverse,
                                 rocfft_precision_single,
                                 Dimension,
                                 lengths,
@@ -123,7 +123,9 @@ int main(int argc, char* argv[])
 			for(size_t k = 0; k < Nz; ++k)
 			{
 				const size_t pos = i * Ny * Nz + j * Nz + k;
-				double diff = std::abs(backx[pos] / (Nx*Ny*Nz) - cx[pos]);
+				double diffx = std::abs(real(backx[pos]) / (Nx*Ny*Nz) - real(cx[pos]));
+				double diffy = std::abs(imag(backx[pos]) / (Nx*Ny*Nz) - imag(cx[pos]));
+				double diff = diffx + diffy;
 				
 				if(diff > error)
 					error = diff;

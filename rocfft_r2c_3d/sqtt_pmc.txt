@@ -1,4 +1,4 @@
-pmc: MemUnitStalled WriteUnitStalled SQ_LDS_BANK_CONFLICT LDSBankConflict
+#pmc: MemUnitStalled WriteUnitStalled SQ_LDS_BANK_CONFLICT LDSBankConflict
 
 #################################################################
 # SQ thread trace 												#

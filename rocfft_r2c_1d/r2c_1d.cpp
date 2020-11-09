@@ -17,26 +17,21 @@ int main(int argc, char* argv[])
 	printf("\n***************************************************\n");
 
     const size_t Nx = (argc < 2) ? 100 : atoi(argv[1]);
-	const size_t Ny = (argc < 3) ? 100 : atoi(argv[2]);
-	const size_t Nz = (argc < 4) ? 100 : atoi(argv[3]);
-    const unsigned int IsProf = (argc < 5) ? 0 : atoi(argv[4]);
-    const size_t Batch = 1;
-	const size_t Dimension = 3;
-	printf("Nx = %zu, Ny = %zu, Nz = %zu, IsProf = %d\n", Nx, Ny, Nz, IsProf);
+    const size_t Batch = (argc < 3) ? 100 : atoi(argv[2]);
+	const size_t Dimension = 1;
+    const unsigned int IsProf = (argc < 4) ? 0 : atoi(argv[3]);
+	printf("N = %zu, Batch = %zu, IsProf = %d\n", Nx, Batch, IsProf);
 
-	std::vector<float> cx(Nx*Ny*Nz*Batch);
-	std::vector<std::complex<float>> cy(Nx*Ny*Nz*Batch);	
+	std::vector<float> cx(Nx*Batch);
+	std::vector<std::complex<float>> cy(Nx*Batch);	
     std::vector<float> backx(cx.size());
-	for(size_t i = 0; i < Nx; ++i)
-	{
-		for(size_t j = 0; j < Ny; ++j)
+    for(size_t i = 0; i < Batch; ++i)
+    {
+		for(size_t k = 0; k < Nx; ++k)
 		{
-			for(size_t k = 0; k < Nz; ++k)
-			{
-				const size_t pos = i * Ny * Nz + j * Nz + k;
-				cx[pos] = 1.0f*(i+j+k);
-				cy[pos] = 0;
-			}
+			const size_t pos = i * Nx + k;
+			cx[i] = 1.0f * (i+k);
+			cy[i] = std::complex<float>(0,0);
 		}
 	}
 	//std::cout << "Input:\n";
@@ -45,14 +40,14 @@ int main(int argc, char* argv[])
 	std::cout << "\n";
 
 	// Create HIP device objects:
-	std::complex<float>* x = NULL;
+	float * x = NULL;
 	std::complex<float>* y = NULL;
 	hipMalloc(&x, cx.size() * sizeof(decltype(cx)::value_type));
 	hipMalloc(&y, cy.size() * sizeof(decltype(cy)::value_type));
 	hipMemcpy(x, cx.data(), cx.size() * sizeof(decltype(cx)::value_type), hipMemcpyHostToDevice);
 
 	// Length are in reverse order because rocfft is column-major.
-	const size_t lengths[3] = {Nx, Ny, Nz};
+	const size_t lengths[1] = {Nx};
 	rocfft_status status = rocfft_status_success;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,18 +111,15 @@ int main(int argc, char* argv[])
 	//	std::cout << real(backx[i])/Nx << ", " << imag(backx[i])/Nx << "\n";
 	
 	float error = 0.0f;
-	for(size_t i = 0; i < Nx; ++i)
-	{
-		for(size_t j = 0; j < Ny; ++j)
+    for(size_t i = 0; i < Batch; i++)
+    {
+		for(size_t k = 0; k < Nx; k++)
 		{
-			for(size_t k = 0; k < Nz; ++k)
-			{
-				const size_t pos = i * Ny * Nz + j * Nz + k;
-				double diff = std::abs(backx[pos] / (Nx*Ny*Nz) - cx[pos]);
-				
-				if(diff > error)
-					error = diff;
-			}
+			const size_t pos = i * Nx + k;
+			double diff = std::abs(backx[pos] / (Nx) - cx[pos]);
+			
+			if(diff > error)
+				error = diff;
 		}
 	}
 	std::cout << "Maximum error: " << error << "\n";
