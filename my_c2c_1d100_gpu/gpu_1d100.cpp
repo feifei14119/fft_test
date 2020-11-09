@@ -11,15 +11,19 @@
 #include "hip/hip_runtime.h"
 #include "rocfft.h"
 
-#define TEST_LENGTH (100)
+#define FFT_LEN (100)
+size_t Nx = FFT_LEN;
+size_t Batch = 1;
+size_t Dimension = 1;
+unsigned int IsProf = 1;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#define MAX_WORK_GROUP_SIZE 1024
-#define TWO_PI (-6.283185307179586476925286766559)
-#define TWO_PI_FP32 (6.283185307179586476925286766559F)
-#define TWO_PI_FP64 (6.283185307179586476925286766559)
-
 /* radix table: tell the FFT algorithms for size <= 4096 ; required by twiddle, passes, and kernel*/
+#define MAX_WORK_GROUP_SIZE (1024)
+#define TWO_PI 				(-6.283185307179586476925286766559)
+#define TWO_PI_FP32 		(6.283185307179586476925286766559F)
+#define TWO_PI_FP64 		(6.283185307179586476925286766559)
+
 struct SpecRecord
 {
     size_t length;
@@ -338,26 +342,26 @@ public:
             radix = *i;
             L *= radix;
 			
-			printf("radix = %zu, L = %zu\n", radix, L);
+			//printf("radix = %zu, L = %zu\n", radix, L);
 
             // Twiddle factors
             for(size_t k = 0; k < (L / radix); k++)
             {
                 double theta = TWO_PI * (k) / (L);
-				printf("	[k/L] = [%zu/%zu], theta = %.3f\n", k, L, theta);
+				//printf("	[k/L] = [%zu/%zu], theta = %.3f\n", k, L, theta);
 				
 				{
 					size_t j = 0;
 					double c = cos((j)*theta);
 					double s = sin ((j)*theta);
-					printf("		j = %zu, alph = %.3f, c = %.3f, s = %.3f\n", j, j*theta, c,s);
+					//printf("		j = %zu, alph = %.3f, c = %.3f, s = %.3f\n", j, j*theta, c,s);
 				}
 					
                 for(size_t j = 1; j < radix; j++)
                 {
                     double c = cos((j)*theta);
                     double s = sin ((j)*theta);
-					printf("[%zu]		j = %zu, alph = %.3f, c = %.3f, s = %.3f\n", idxcnt, j, j*theta, c,s);
+					//printf("[%zu]		j = %zu, alph = %.3f, c = %.3f, s = %.3f\n", idxcnt, j, j*theta, c,s);
 					idxcnt++;
 
                     wc[nt].x = c;
@@ -379,7 +383,7 @@ public:
 #define C5QD 0.58778525229247312916870595463907f
 #define C5QE 0.80901699437494742410229341718282f
 
-__device__ void FwdRad10B1(float2* R0, float2* R1, float2* R2, float2* R3, float2* R4, float2* R5, float2* R6, float2* R7, float2* R8, float2* R9)
+inline __device__ void FwdRad10B1(float2* R0, float2* R1, float2* R2, float2* R3, float2* R4, float2* R5, float2* R6, float2* R7, float2* R8, float2* R9)
 {
     float TR0, TI0, TR1, TI1, TR2, TI2, TR3, TI3, TR4, TI4, TR5, TI5, TR6, TI6, TR7, TI7, TR8, TI8, TR9, TI9;
 
@@ -431,7 +435,7 @@ __device__ void FwdRad10B1(float2* R0, float2* R1, float2* R2, float2* R3, float
     (*R8).y = TI6 - (-C5QB * TR7 - C5QA * TI7);
     (*R9).y = TI8 - (-C5QD * TR9 - C5QE * TI9);
 }
-__device__ void FwdPass0_len100(const float2 *twiddles, 
+inline __device__ void FwdPass0_len100(const float2 *twiddles, 
 																const size_t stride_in, const size_t stride_out, 
 																unsigned int rw, unsigned int b, unsigned int me, unsigned int inOffset, unsigned int outOffset, 
 																float2 *bufIn, 
@@ -506,7 +510,7 @@ __device__ void FwdPass0_len100(const float2 *twiddles,
 	
 	__syncthreads();
 }
-__device__ void FwdPass1_len100(const float2  *twiddles, 
+inline __device__ void FwdPass1_len100(const float2  *twiddles, 
 																const size_t stride_in, const size_t stride_out, 
 																unsigned int rw, unsigned int b, unsigned int me, unsigned int inOffset, unsigned int outOffset, 
 																float *bufInRe, float *bufInIm, 
@@ -521,7 +525,7 @@ __device__ void FwdPass1_len100(const float2  *twiddles,
 		double phase;
 		float phase_fp;
 		uint32_t k = me;//j=Wn;
-		uint32_t L = 100;
+		uint32_t L = FFT_LEN;
 
 		 //float2 W1;// = twiddles[9 + 9*((1*me + 0)%10) + 0];
 		 //float2 W2;// = twiddles[9 + 9*((1*me + 0)%10) + 1];
@@ -535,8 +539,8 @@ __device__ void FwdPass1_len100(const float2  *twiddles,
 
 		phase = -1.0/L * 1 * k;
 		phase_fp = (float)(phase);
-		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
-		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		//asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		//asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
 		//wx = cosf(float(phase * TWO_PI_FP64)); 
 		//wy = sinf(float(phase * TWO_PI_FP64)); 
 		float2 W1 = twiddles[9 + 9*((1*me + 0)%10) + 0];
@@ -549,8 +553,8 @@ __device__ void FwdPass1_len100(const float2  *twiddles,
 		
 		phase = -1.0/L * 2 * k;
 		phase_fp = (float)(phase);
-		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
-		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		//asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		//asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
 		//wx = cosf(float(phase * TWO_PI_FP64)); 
 		//wy = sinf(float(phase * TWO_PI_FP64)); 
 		float2 W2 = twiddles[9 + 9*((1*me + 0)%10) + 1];
@@ -563,8 +567,8 @@ __device__ void FwdPass1_len100(const float2  *twiddles,
 		
 		phase = -1.0/L * 3 * k;
 		phase_fp = (float)(phase);
-		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
-		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		//asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		//asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
 		float2 W3 = twiddles[9 + 9*((1*me + 0)%10) + 2];
 		wx = W3.x; wy = W3.y;
 		rx = (*R3).x; ry = (*R3).y;
@@ -575,8 +579,8 @@ __device__ void FwdPass1_len100(const float2  *twiddles,
 		
 		phase = -1.0/L * 4 * k;
 		phase_fp = (float)(phase);
-		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
-		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		//asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		//asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
 		float2 W4 = twiddles[9 + 9*((1*me + 0)%10) + 3];
 		wx = W4.x; wy = W4.y;
 		rx = (*R4).x; ry = (*R4).y;
@@ -587,8 +591,8 @@ __device__ void FwdPass1_len100(const float2  *twiddles,
 		
 		phase = -1.0/L * 5 * k;
 		phase_fp = (float)(phase);
-		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
-		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		//asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		//asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
 		float2 W5 = twiddles[9 + 9*((1*me + 0)%10) + 4];
 		wx = W5.x; wy = W5.y;
 		rx = (*R5).x; ry = (*R5).y;
@@ -599,8 +603,8 @@ __device__ void FwdPass1_len100(const float2  *twiddles,
 		
 		phase = -1.0/L * 6 * k;
 		phase_fp = (float)(phase);
-		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
-		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		//asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		//asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
 		float2 W6 = twiddles[9 + 9*((1*me + 0)%10) + 5];
 		wx = W6.x; wy = W6.y;
 		rx = (*R6).x; ry = (*R6).y;
@@ -611,8 +615,8 @@ __device__ void FwdPass1_len100(const float2  *twiddles,
 		
 		phase = -1.0/L * 7 * k;
 		phase_fp = (float)(phase);
-		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
-		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		//asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		//asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
 		float2 W7 = twiddles[9 + 9*((1*me + 0)%10) + 6];
 		wx = W7.x; wy = W7.y;
 		rx = (*R7).x; ry = (*R7).y;
@@ -623,8 +627,8 @@ __device__ void FwdPass1_len100(const float2  *twiddles,
 		
 		phase = -1.0/L * 8 * k;
 		phase_fp = (float)(phase);
-		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
-		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		//asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		//asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
 		float2 W8 = twiddles[9 + 9*((1*me + 0)%10) + 7];
 		wx = W8.x; wy = W8.y;
 		rx = (*R8).x; ry = (*R8).y;
@@ -635,8 +639,8 @@ __device__ void FwdPass1_len100(const float2  *twiddles,
 		
 		phase = -1.0/L * 9 * k;
 		phase_fp = (float)(phase);
-		asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
-		asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
+		//asm volatile("v_cos_f32 %0, %1\n":"=v"(wx):"v"(phase_fp));
+		//asm volatile("v_sin_f32 %0, %1\n":"=v"(wy):"v"(phase_fp));
 		float2 W9 = twiddles[9 + 9*((1*me + 0)%10) + 8];
 		wx = W9.x; wy = W9.y;
 		rx = (*R9).x; ry = (*R9).y;
@@ -663,7 +667,7 @@ __device__ void FwdPass1_len100(const float2  *twiddles,
 	}	
 }
 
-__device__ void fwd_len100_device(const float2  *twiddles, 
+inline __device__ void fwd_len100_device(const float2  *twiddles, 
 																const size_t stride_in, const size_t stride_out, 
 																unsigned int rw, unsigned int b, unsigned int me, unsigned int ldsOffset, 
 																float2  *lwbIn, float2  *lwbOut, 
@@ -673,7 +677,7 @@ __device__ void fwd_len100_device(const float2  *twiddles,
 	FwdPass0_len100(twiddles, stride_in, stride_out,       rw, b, me, 0, ldsOffset,     lwbIn, lds, lds,         &R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9);
 	FwdPass1_len100(twiddles, stride_in, stride_out,       rw, b, me, ldsOffset, 0,     lds, lds,  lwbOut,      &R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9);
 }
-__global__ void fft_fwd_op_len100( const float2  * twiddles, float2  * gbIn, float2  * gbOut)
+__global__ void fft_fwd_op_len100( const size_t batch_count, const float2  * twiddles, float2  * gbIn, float2  * gbOut)
 {
 	__shared__ float  lds[1200];
 	
@@ -681,30 +685,31 @@ __global__ void fft_fwd_op_len100( const float2  * twiddles, float2  * gbIn, flo
 	size_t lengths[3];
 	size_t stride_in[4];
 	size_t stride_out[4];
-	size_t batch_count = 1;
-	lengths[0] = 100; lengths[1] = 1; lengths[2] = 1;
+	lengths[0] = FFT_LEN; lengths[1] = 1; lengths[2] = 1;
 	stride_in[0] = 1;stride_in[1] = lengths[0];stride_in[2] = lengths[0]*lengths[1];stride_in[3] = lengths[0]*lengths[1]*lengths[2];
 	stride_out[0] = 1;stride_out[1] = lengths[0];stride_out[2] = lengths[0]*lengths[1];stride_out[3] = lengths[0]*lengths[1]*lengths[2];
 	
 	unsigned int me = (unsigned int)hipThreadIdx_x;
-	unsigned int batch = (unsigned int)hipBlockIdx_x;
+	unsigned int batch = (unsigned int)hipBlockIdx_y;
 
 	unsigned int iOffset = 0;
 	unsigned int oOffset = 0;
 	float2  *lwbIn;
 	float2  *lwbOut;
 
-	unsigned int upper_count = batch_count;
-	
+	unsigned int upper_count = batch_count;	
 	for(int i=1; i<dim; i++)
 	{
 		upper_count *= lengths[i];
 	}
+
 	// do signed math to guard against underflow
-	unsigned int rw = (static_cast<int>(me) < (static_cast<int>(upper_count)  - static_cast<int>(batch)*12)*10) ? 1 : 0;
+	//unsigned int rw = (static_cast<int>(me) < (static_cast<int>(upper_count)  - static_cast<int>(batch)*12)*10) ? 1 : 0;
+	unsigned int rw = 1;
 	unsigned int b = 0;
 
-	size_t counter_mod = (batch*12 + (me/10));
+	//size_t counter_mod = (batch*1 + (me/10));
+	size_t counter_mod = batch;
 	if(dim == 1)
 	{
 		iOffset += counter_mod*stride_in[1];
@@ -729,14 +734,12 @@ __global__ void fft_fwd_op_len100( const float2  * twiddles, float2  * gbIn, flo
 	lwbIn = gbIn + iOffset;
 	lwbOut = gbOut + oOffset;
 
-	fwd_len100_device(twiddles, stride_in[0], stride_out[0],    rw, b, me%10, (me/10)*100,    lwbIn, lwbOut, lds);
+	fwd_len100_device(twiddles, stride_in[0], stride_out[0],    rw, b, me%10, (me/10)*FFT_LEN,    lwbIn, lwbOut, lds);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void test_gpu(float2 * x, float2 * y)
-{	
-	const size_t Nx = TEST_LENGTH;
-	
+{		
 	printf("twiddles_create_pr \n");
 	std::vector<size_t> radices;
 	radices = GetRadices(Nx);
@@ -749,11 +752,15 @@ void test_gpu(float2 * x, float2 * y)
 	hipMemcpy(dtw, twtc, Nx * sizeof(float2), hipMemcpyHostToDevice);	
 
 	std::cout << "gpu test\n";
-	hipLaunchKernelGGL(fft_fwd_op_len100, dim3(1, 1), dim3(10, 1), 
+	
+	dim3 grp_num = dim3(1, Batch);
+	dim3 grp_size = dim3(10, 1);
+	
+	hipLaunchKernelGGL(fft_fwd_op_len100, grp_num, grp_size, 
 					0, 0, 
-					dtw, x, y);
-					
-	if(1)
+					Batch, dtw, x, y);
+		
+	if(IsProf > 0)
 	{
 		int iteration_times = 1000;
 		timespec startTime,stopTime;	
@@ -761,7 +768,7 @@ void test_gpu(float2 * x, float2 * y)
 		double ElapsedNanoSec = 0;
 		clock_gettime(CLOCK_MONOTONIC, &startTime);
 		for(int i = 0;i<iteration_times;i++)
-			hipLaunchKernelGGL(fft_fwd_op_len100, dim3(1, 1), dim3(10, 1), 0, 0, dtw, x, y);
+			hipLaunchKernelGGL(fft_fwd_op_len100, grp_num, grp_size, 0, 0, Batch, dtw, x, y);
 		hipDeviceSynchronize();
 		clock_gettime(CLOCK_MONOTONIC, &stopTime);
 		double d_startTime = static_cast<double>(startTime.tv_sec)*1e9 + static_cast<double>(startTime.tv_nsec);
@@ -775,30 +782,26 @@ void test_gpu(float2 * x, float2 * y)
 int main(int argc, char* argv[])
 {		
 	printf("\n***************************************************\n");
-	std::cout << "rocFFT complex 1d FFT example";
+	std::cout << "gpu fft  len-100 test";
 	printf("\n***************************************************\n");
 
 	// The problem size
-	const size_t Nx = (argc < 2) ? TEST_LENGTH : atoi(argv[1]);
-	const size_t batch = 1;
-	const size_t dimension = 1;
-	std::cout << "Nx: " << Nx  << std::endl;
+	Batch = (argc < 2) ? 1 : atoi(argv[1]);
+	IsProf = (argc < 3) ? 0 : atoi(argv[2]);
+	Dimension = 1;
+	printf("Nx = %zu, Batch = %zu, IsProf = %d\n", Nx, Batch, IsProf);
 
-	std::vector<std::complex<float>> cx(Nx*batch);
-	std::vector<std::complex<float>> cy(Nx*batch);	
-	std::vector<std::complex<float>> mycy(Nx*batch);	
-    std::vector<std::complex<float>> backx(cx.size());
-	for(size_t i = 0; i < Nx; ++i)
+	std::vector<std::complex<float>> cx(Nx*Batch);
+	std::vector<std::complex<float>> cy(Nx*Batch);
+	std::vector<std::complex<float>> mycy(Nx*Batch);
+	for(size_t i = 0; i < Batch; i++)
 	{
-		cx[i] = std::complex<float>(1.0f*i, -0.1f*i);
-		cy[i] = std::complex<float>(0,0);
-	}
-	if(0)
-	{
-		std::cout << "Input:\n";
-		for(size_t i = 0; i < Nx; ++i)
-			std::cout << real(cx[i]) << ", " << imag(cx[i]) << "\n";
-		std::cout << "\n";
+		for(size_t k = 0; k < Nx; k++)
+		{
+			size_t pos = i * Nx + k;
+			cx[pos] = std::complex<float>(1.0f*(0+k), -0.1f*(0+k));
+			mycy[pos] = std::complex<float>(3.14f, -1.414f);
+		}
 	}
 
 	// Create HIP device objects:
@@ -816,16 +819,16 @@ int main(int argc, char* argv[])
 	
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	std::cout << "Transformed:\n";
+	std::cout << "rocfft:\n";
 	// Create plans
 	rocfft_plan forward = NULL;
 	status = rocfft_plan_create(&forward,
                                 rocfft_placement_notinplace,
                                 rocfft_transform_type_complex_forward,
                                 rocfft_precision_single,
-                                dimension,
+                                Dimension,
                                 lengths,
-                                batch,
+                                Batch,
                                 NULL);
 	assert(status == rocfft_status_success);
 
@@ -846,9 +849,8 @@ int main(int argc, char* argv[])
 		std::cout << "Output:\n";
 		for(size_t i = 0; i < 10; ++i)
 			std::cout << real(cy[i]) << ", " << imag(cy[i]) << "\n";
-	}
-	
-	if(0)
+	}	
+	if(IsProf > 0)
 	{
 		int iteration_times = 1000;
 		timespec startTime,stopTime;	
@@ -867,108 +869,42 @@ int main(int argc, char* argv[])
 	}
 
 	std::cout << "\n";
-	//return 0;
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	test_gpu(x, myy);
-	hipMemcpy(mycy.data(), myy, mycy.size() * sizeof(float2), hipMemcpyDeviceToHost);
-	
+
+	hipMemcpy(mycy.data(), myy, mycy.size() * sizeof(float2), hipMemcpyDeviceToHost);		
 	if(0)
 	{
 		std::cout << "My output:\n";
+		size_t b = 1;
 		for(size_t i = 0; i < 10; ++i)
-			std::cout << real(mycy[i]) << ", " << imag(mycy[i]) << "\n";
+			std::cout << real(mycy[b*Nx+i]) << ", " << imag(mycy[b*Nx+i]) << "\n";
 	}
 	
-	float errormy = 0.0f;
-	for(size_t i = 0; i < Nx; i++)
+	
+	double maxerr = 0.0f;
+	for(size_t i = 0; i < Batch; i++)
 	{
-		float diffx = std::abs(real(mycy[i]) - real(cy[i]));
-		float diffy = std::abs(imag(mycy[i]) - imag(cy[i]));
-		float diff = diffx + diffy;
-		if(diff > errormy)
-			errormy = diff;
-		/*if(diff > 1.0f)
+		for(size_t k = 0; k < Nx; k++)
 		{
-			std::cout << "[" << i << "]";
-			std::cout << real(cy[i]) << ", " << imag(cy[i]) << ";\t";
-			std::cout << real(mycy[i]) << ", " << imag(mycy[i]) << "\n";
-		}*/
+			size_t pos = i * Nx + k;
+			double diffx = std::abs(real(mycy[pos]) - real(cy[pos]));
+			double diffy = std::abs(imag(mycy[pos]) - imag(cy[pos]));
+			double diff = diffx + diffy;
+			if(diff > maxerr)
+				maxerr = diff;
+		}
 	}
-	std::cout << "Maximum error: " << errormy << "\n";
-	return 0;
+	std::cout << "Maximum error: " << maxerr << "\n";
+	
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	std::cout << "Transformed back:\n";
-	// Create plans
-	rocfft_plan backward = NULL;
-	status = rocfft_plan_create(&backward,
-                                rocfft_placement_notinplace,
-                                rocfft_transform_type_complex_inverse,
-                                rocfft_precision_single,
-                                dimension,
-                                lengths,
-                                batch,
-                                NULL);
-	assert(status == rocfft_status_success);
-
-	rocfft_execution_info backwardinfo = NULL;
-	status = rocfft_execution_info_create(&backwardinfo);  									assert(status == rocfft_status_success);
-	size_t bbuffersize = 0;
-	status = rocfft_plan_get_work_buffer_size(backward, &bbuffersize);    					assert(status == rocfft_status_success);
-	void* bbuffer = NULL;
-	hipMalloc(&bbuffer, bbuffersize);
-	status = rocfft_execution_info_set_work_buffer(backwardinfo, bbuffer, bbuffersize);    	assert(status == rocfft_status_success);
-	
-	// Execute the backward transform
-	status = rocfft_execute(backward, (void**)&y, (void**)&x, backwardinfo);     			assert(status == rocfft_status_success);
-	
-	hipMemcpy(backx.data(), x, backx.size() * sizeof(decltype(backx)::value_type), hipMemcpyDeviceToHost);
-	if(1)
-	{
-		std::cout << "Output:\n";
-		for(size_t i = 0; i < Nx; ++i)
-			std::cout << real(backx[i])/Nx << ", " << imag(backx[i])/Nx << "\n";
-	}
-
-	if(0)
-	{
-		int iteration_times = 1000;
-		timespec startTime,stopTime;	
-		double ElapsedMilliSec = 0;
-		double ElapsedNanoSec = 0;
-		clock_gettime(CLOCK_MONOTONIC, &startTime);
-		for(int i = 0;i<iteration_times;i++)
-			rocfft_execute(backward, (void**)&y, (void**)&x, backwardinfo);
-		hipDeviceSynchronize();
-		clock_gettime(CLOCK_MONOTONIC, &stopTime);
-		double d_startTime = static_cast<double>(startTime.tv_sec)*1e9 + static_cast<double>(startTime.tv_nsec);
-		double d_currentTime = static_cast<double>(stopTime.tv_sec)*1e9 + static_cast<double>(stopTime.tv_nsec);
-		ElapsedNanoSec = d_currentTime - d_startTime;
-		ElapsedMilliSec = ElapsedNanoSec / 1e6;
-		printf("elapsed mill sec = %.3f(ms)\n", ElapsedMilliSec/iteration_times);
-	}
-	//return 0;
-	std::cout << "\n";	
-	
-	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	float error = 0.0f;
-	for(size_t i = 0; i < Nx; i++)
-	{
-		float diff = std::abs(real(backx[i]) / Nx - real(cx[i]));
-		if(diff > error)
-			error = diff;
-	}
-	std::cout << "Maximum error: " << error << "\n";	
 	
 	hipFree(x);
 	hipFree(y);
-	hipFree(fbuffer);
-	hipFree(bbuffer);
-
-	// Destroy plans
+	hipFree(myy);
 	rocfft_plan_destroy(forward);
-	rocfft_plan_destroy(backward);
 
 	rocfft_cleanup();
 }
