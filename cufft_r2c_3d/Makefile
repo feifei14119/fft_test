@@ -268,7 +268,7 @@ endif
 # Target rules
 all: build
 
-build: r2c_1d
+build: r2c_3d
 
 check.deps:
 ifeq ($(SAMPLE_ENABLED),0)
@@ -277,19 +277,19 @@ else
 	@echo "Sample is ready - all dependencies have been met"
 endif
 
-r2c_1d.o:r2c_1d.cu
+r2c_3d.o:r2c_3d.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-r2c_1d: r2c_1d.o
+r2c_3d: r2c_3d.o
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 	$(EXEC) mkdir -p ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
 	$(EXEC) cp $@ ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
 
 run: build
-	$(EXEC) ./r2c_1d
+	$(EXEC) ./r2c_3d
 
 clean:
-	rm -f r2c_1d r2c_1d.o
-	rm -rf ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)/r2c_1d
+	rm -f r2c_3d r2c_3d.o
+	rm -rf ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)/r2c_3d
 
 clobber: clean

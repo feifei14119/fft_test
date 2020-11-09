@@ -239,7 +239,7 @@ LIBRARIES :=
 ################################################################################
 
 # Gencode arguments
-SMS ?= 35 37 50 52 60 61 70 75 80 86
+SMS ?= 61 70 75
 
 ifeq ($(SMS),)
 $(info >>> WARNING - no SM architectures have been specified - waiving sample <<<)
@@ -268,7 +268,7 @@ endif
 # Target rules
 all: build
 
-build: fft_3d
+build: c2c_3d
 
 check.deps:
 ifeq ($(SAMPLE_ENABLED),0)
@@ -277,19 +277,19 @@ else
 	@echo "Sample is ready - all dependencies have been met"
 endif
 
-fft_3d.o:fft_3d.cu
+c2c_3d.o:c2c_3d.cu
 	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
-fft_3d: fft_3d.o
+c2c_3d: c2c_3d.o
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
 	$(EXEC) mkdir -p ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
 	$(EXEC) cp $@ ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)
 
 run: build
-	$(EXEC) ./fft_3d
+	$(EXEC) ./c2c_3d
 
 clean:
-	rm -f fft_3d fft_3d.o
-	rm -rf ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)/fft_3d
+	rm -f c2c_3d c2c_3d.o
+	rm -rf ../../bin/$(TARGET_ARCH)/$(TARGET_OS)/$(BUILD_TYPE)/c2c_3d
 
 clobber: clean

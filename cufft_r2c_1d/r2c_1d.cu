@@ -18,39 +18,32 @@
 
 
 ////////////////////////////////////////////////////////////////////////////////
-#define T float
-#define T2 float2
 void runTest(int argc, char **argv) 
 {
 	printf("[simpleCUFFT] is starting...\n");
 
 	findCudaDevice(argc, (const char **)argv);
-  
-    const size_t Nx      = (argc < 2) ? 100 : atoi(argv[1]);
-	const size_t Ny      = 1;
-	const size_t Nz      = 1;
+    
+    const size_t Nx = (argc < 2) ? 100 : atoi(argv[1]);
+    const size_t Batch = (argc < 3) ? 100 : atoi(argv[2]);
+    const unsigned int IsProf = (argc < 4) ? 0 : atoi(argv[3]);
+	printf("N = %zu, Batch = %zu, IsProf = %d\n", Nx, Batch, IsProf);
 
-    std::vector<T> cx(Nx * Ny * Nz);
-    std::vector<T> backx(cx.size());
-    std::fill(cx.begin(), cx.end(), 0.0);
-    for(size_t i = 0; i < Nx; ++i)
+    std::vector<float> cx(Nx * Batch);
+    std::vector<float> cy(Nx * Batch);
+    std::vector<float> backx(cx.size());
+    for(size_t i = 0; i < Batch; ++i)
     {
-        for(size_t j = 0; j < Ny; ++j)
-        {
-            for(size_t k = 0; k < Nz; ++k)
-            {
-                const size_t pos = i * Ny * Nz + j * Nz + k;
-                cx[pos]          = i + j + k;
-            }
-        }
+		for(size_t k = 0; k < Nx; ++k)
+		{
+			const size_t pos = i * Nx + k;
+			cx[pos] = (i + k) * 1.0f;
+		}
     }
-
-    // Output buffer
-    std::vector<std::complex<T>> cy(Nx * Ny * Nz);
   
     // Create HIP device objects:
-    T* x = NULL;
-    T2 * y = NULL;
+    cufftReal* x = NULL;
+    cufftComplex * y = NULL;
     cudaMalloc(&x, cx.size() * sizeof(decltype(cx)::value_type));
 	cudaMalloc(&y, cy.size() * sizeof(decltype(cy)::value_type));
     cudaMemcpy(x, cx.data(), cx.size() * sizeof(decltype(cx)::value_type), cudaMemcpyHostToDevice);
@@ -59,27 +52,25 @@ void runTest(int argc, char **argv)
     // Create plans
 	cufftHandle plan;
 	cufftHandle plan2;
-	checkCudaErrors(cufftPlan1d(&plan, Nx*Ny*Nz, CUFFT_C2C, 1));		checkCudaErrors(cufftExecR2C(plan, x, reinterpret_cast<cufftComplex *>(y)));
-	checkCudaErrors(cufftPlan1d(&plan2, Nx*Ny*Nz, CUFFT_C2R, 1));		checkCudaErrors(cufftExecC2R(plan2, reinterpret_cast<cufftComplex *>(y), x));   
+	checkCudaErrors(cufftPlan1d(&plan,  Nx, CUFFT_R2C, Batch));		checkCudaErrors(cufftExecR2C(plan,  x, y));
+	checkCudaErrors(cufftPlan1d(&plan2, Nx, CUFFT_C2R, Batch));		checkCudaErrors(cufftExecC2R(plan2, y, x));   
     cudaMemcpy(backx.data(), x, backx.size() * sizeof(decltype(backx)::value_type), cudaMemcpyDeviceToHost);
   
 
-    double       error = 0.0f;
-    for(size_t i = 0; i < Nx; i++)
+    double error = 0.0f;
+    for(size_t i = 0; i < Batch; i++)
     {
-        for(size_t j = 0; j < Ny; j++)
-        {
-            for(size_t k = 0; k < Nz; k++)
-            {
-                double diff = std::abs(backx[i] / (Nx * Ny * Nz) - cx[i]);
-                if(diff > error)
-                    error = diff;
-            }
-        }
+		for(size_t k = 0; k < Nx; k++)
+		{
+			const size_t pos = i * Nx + k;
+			double diff = std::abs(backx[pos] / Nx - cx[pos]);
+			if(diff > error)
+				error = diff;
+		}
     }
     std::cout << "Maximum error: " << error << "\n";
 	
-	if(0)
+	if(IsProf > 0)
 	{
 		int iteration_times = 1000;
 		timespec startTime,stopTime;	
@@ -87,7 +78,7 @@ void runTest(int argc, char **argv)
 		double ElapsedNanoSec = 0;
 		clock_gettime(CLOCK_MONOTONIC, &startTime);
 		for(int i = 0;i<iteration_times;i++)
-			rocfft_execute(forward, (void**)&x, (void**)&y, forwardinfo);
+			checkCudaErrors(cufftExecR2C(plan,  x, y));
 		cudaDeviceSynchronize();
 		clock_gettime(CLOCK_MONOTONIC, &stopTime);
 		double d_startTime = static_cast<double>(startTime.tv_sec)*1e9 + static_cast<double>(startTime.tv_nsec);
@@ -99,8 +90,8 @@ void runTest(int argc, char **argv)
 	
 	//delete cx;
 	//free(backx);
-	//checkCudaErrors(cudaFree(x));
-	//checkCudaErrors(cudaFree(y));
+	checkCudaErrors(cudaFree(x));
+	checkCudaErrors(cudaFree(y));
 	checkCudaErrors(cufftDestroy(plan));
 	checkCudaErrors(cufftDestroy(plan2));
 	
