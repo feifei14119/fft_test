@@ -1,0 +1,28 @@
+dispatch[0], gpu-id(0), queue-id(0), queue-index(0), pid(3863), tid(3866), grd(64), wgr(64), lds(0), scr(0), vgpr(20), sgpr(32), fbar(8448), sig(0x7f7885613b00), kernel-name("_Z12chirp_deviceI15HIP_vector_typeIfLj2EEEvmmPT_S3_ii.kd")
+  SQTT (
+    SE(0) size(128)
+  )
+dispatch[1], gpu-id(0), queue-id(0), queue-index(1), pid(3863), tid(3866), grd(15360), wgr(64), lds(0), scr(0), vgpr(24), sgpr(40), fbar(16512), sig(0x7f7885613a80), kernel-name("_Z10mul_deviceI15HIP_vector_typeIfLj2EEEvmmmmPKT_PS2_mPKmS7_S7_ii.kd")
+  SQTT (
+    SE(0) size(8576)
+  )
+dispatch[2], gpu-id(0), queue-id(0), queue-index(2), pid(3863), tid(3866), grd(3840), wgr(64), lds(1024), scr(0), vgpr(24), sgpr(40), fbar(757120), sig(0x7f7885613a00), kernel-name("_Z16fft_fwd_ip_len64I15HIP_vector_typeIfLj2EEL9StrideBin0EEvPKT_mPKmS7_mPS3_.kd")
+  SQTT (
+    SE(0) size(6080)
+  )
+dispatch[3], gpu-id(0), queue-id(0), queue-index(3), pid(3863), tid(3866), grd(64), wgr(64), lds(1024), scr(0), vgpr(24), sgpr(40), fbar(757120), sig(0x7f7885613980), kernel-name("_Z16fft_fwd_ip_len64I15HIP_vector_typeIfLj2EEL9StrideBin0EEvPKT_mPKmS7_mPS3_.kd")
+  SQTT (
+    SE(0) size(128)
+  )
+dispatch[4], gpu-id(0), queue-id(0), queue-index(4), pid(3863), tid(3866), grd(15360), wgr(64), lds(0), scr(0), vgpr(24), sgpr(40), fbar(16512), sig(0x7f7885613900), kernel-name("_Z10mul_deviceI15HIP_vector_typeIfLj2EEEvmmmmPKT_PS2_mPKmS7_S7_ii.kd")
+  SQTT (
+    SE(0) size(7744)
+  )
+dispatch[5], gpu-id(0), queue-id(0), queue-index(5), pid(3863), tid(3866), grd(3840), wgr(64), lds(1024), scr(0), vgpr(24), sgpr(40), fbar(768768), sig(0x7f7885613880), kernel-name("_Z17fft_back_ip_len64I15HIP_vector_typeIfLj2EEL9StrideBin0EEvPKT_mPKmS7_mPS3_.kd")
+  SQTT (
+    SE(0) size(5984)
+  )
+dispatch[6], gpu-id(0), queue-id(0), queue-index(6), pid(3863), tid(3866), grd(7488), wgr(64), lds(0), scr(0), vgpr(24), sgpr(40), fbar(16512), sig(0x7f7885613800), kernel-name("_Z10mul_deviceI15HIP_vector_typeIfLj2EEEvmmmmPKT_PS2_mPKmS7_S7_ii.kd")
+  SQTT (
+    SE(0) size(5632)
+  )
