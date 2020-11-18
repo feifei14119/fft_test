@@ -1,0 +1,31 @@
+
+***************************************************
+rocFFT complex 1d FFT example
+***************************************************
+Nx = 4096, Batch = 240, IsProf = 0
+ROCProfiler: input from ".//rpl_data_201118_041709_40581/input1.xml"
+  gpu_index = 
+  kernel = 
+  range = 
+  0 metrics
+  1 traces
+    SQTT (
+      MASK = 0xf09
+      SE_MASK = 0x1
+      TOKEN_MASK = 0x344b
+      TOKEN_MASK2 = 0xffffffff
+    )
+Transformed:
+
+twiddles_create_pr 
+tableLength=12
+numPasses=3, table item 0 
+radices size = 3:
+	16
+	16
+	16
+
+gpu test
+Maximum error: 0
+
+ROCPRofiler: 2 contexts collected, output directory .//rpl_data_201118_041709_40581/input1_results_201118_041709

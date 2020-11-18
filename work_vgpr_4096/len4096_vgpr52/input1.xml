@@ -1,0 +1,3 @@
+# 201118_041526 './/rpl_data_201118_041526_40288/input1.xml' generated with '/opt/rocm-3.7.0/rocprofiler/bin/txt2xml.sh 1'
+<metric range="" kernel="" gpu_index=""></metric>
+<trace name="SQTT"><parameters SE_MASK=0x1 MASK=0x0F09 TOKEN_MASK=0x344B TOKEN_MASK2=0xFFFFFFFF ></parameters></trace>

@@ -17,7 +17,7 @@
 #include "./rocfft_kernel_4096.h"
 
 #define TEST_LENGTH (4096)
-#define BATCH_SIZE  (240)
+#define BATCH_SIZE  (60)
 
 size_t Nx;
 size_t Batch;
