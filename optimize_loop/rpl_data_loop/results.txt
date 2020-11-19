@@ -1,0 +1,8 @@
+dispatch[0], gpu-id(0), queue-id(0), queue-index(0), pid(48432), tid(48435), grd(3840), wgr(64), lds(3584), scr(0), vgpr(68), sgpr(48), fbar(5964288), sig(0x7fedccf7eb00), kernel-name("_Z17fft_fwd_op_len112I15HIP_vector_typeIfLj2EEL9StrideBin0EEvPKT_mPKmS7_S7_mPS3_S8_.kd")
+  SQTT (
+    SE(0) size(26080)
+  )
+dispatch[1], gpu-id(0), queue-id(0), queue-index(2), pid(48432), tid(48435), grd(3840), wgr(64), lds(3584), scr(0), vgpr(80), sgpr(32), fbar(0), sig(0x7fedccf7ea00), kernel-name("_Z20my_fft_fwd_op_len112PK15HIP_vector_typeIfLj2EEmPKmS4_S4_mPS0_S5_.kd")
+  SQTT (
+    SE(0) size(24416)
+  )
