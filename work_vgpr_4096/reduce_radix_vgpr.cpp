@@ -14,10 +14,11 @@
 //#include "./common.h"
 //#include "./butterfly_constant.h"
 //#include "./rocfft_butterfly_template.h"
+#include "./rocfft_kernel_3125.h"
 #include "./rocfft_kernel_4096.h"
 
-#define TEST_LENGTH (4096)
-#define BATCH_SIZE  (60)
+#define FFT_LENGTH (4096) // 3125, 4096
+#define BATCH_SIZE  (240) // for 60 CU, set 240 for 4096, set 300 for 3125
 
 size_t Nx;
 size_t Batch;
@@ -400,8 +401,8 @@ void test_gpu(float2 * x, float2 * y)
 
 
 	const size_t lengths[1] = {Nx};
-	const size_t stride_in[2] = {1, 4096};
-	const size_t stride_out[2] = {1, 4096};
+	const size_t stride_in[2] = {1, Nx};
+	const size_t stride_out[2] = {1, Nx};
 	size_t * dlen = NULL;
 	size_t * dstrin = NULL;
 	size_t * dstrout = NULL;
@@ -414,9 +415,14 @@ void test_gpu(float2 * x, float2 * y)
 
 
 	std::cout << "gpu test\n";
-	dim3 gp_sz = dim3(256);
+	dim3 gp_sz = (Nx == 4096)?dim3(256):dim3(125);
 	dim3 gp_num = dim3(Batch);
+    if(Nx == 4096)
 	hipLaunchKernelGGL(my_fft_fwd_op_len4096, gp_num, gp_sz, 
+					0, 0, 
+					dtw, 1, dlen, dstrin, dstrout, Batch, x, y);
+    else
+	hipLaunchKernelGGL(my_fft_fwd_op_len3125, gp_num, gp_sz, 
 					0, 0, 
 					dtw, 1, dlen, dstrin, dstrout, Batch, x, y);
 					
@@ -428,7 +434,12 @@ void test_gpu(float2 * x, float2 * y)
 		double ElapsedNanoSec = 0;
 		clock_gettime(CLOCK_MONOTONIC, &startTime);
 		for(int i = 0;i<iteration_times;i++)
+        {
+            if(Nx == 4096)
 			hipLaunchKernelGGL(my_fft_fwd_op_len4096, gp_num, gp_sz, 0, 0, dtw, 1, dlen, dstrin, dstrout, Batch, x, y);
+            else
+			hipLaunchKernelGGL(my_fft_fwd_op_len3125, gp_num, gp_sz, 0, 0, dtw, 1, dlen, dstrin, dstrout, Batch, x, y);
+        }
 		hipDeviceSynchronize();
 		clock_gettime(CLOCK_MONOTONIC, &stopTime);
 		double d_startTime = static_cast<double>(startTime.tv_sec)*1e9 + static_cast<double>(startTime.tv_nsec);
@@ -446,11 +457,11 @@ void test_gpu(float2 * x, float2 * y)
 int main(int argc, char* argv[])
 {		
 	printf("\n***************************************************\n");
-	std::cout << "rocFFT complex 1d FFT example";
+	std::cout << "rocFFT complex 1d FFT reduce vgpr";
 	printf("\n***************************************************\n");
 
 	// The problem size
-	Nx = (argc < 2) ? TEST_LENGTH : atoi(argv[1]);
+	Nx = (argc < 2) ? FFT_LENGTH : atoi(argv[1]);
 	Batch = (argc < 3) ? BATCH_SIZE : atoi(argv[2]);
 	IsProf = (argc < 4) ? 0 : atoi(argv[3]);
 	Dimension = 1;

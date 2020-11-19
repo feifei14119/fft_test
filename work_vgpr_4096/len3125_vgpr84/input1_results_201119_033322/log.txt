@@ -1,0 +1,32 @@
+
+***************************************************
+rocFFT complex 1d FFT reduce vgpr
+***************************************************
+Nx = 3125, Batch = 300, IsProf = 0
+ROCProfiler: input from ".//rpl_data_201119_033322_46331/input1.xml"
+  gpu_index = 
+  kernel = 
+  range = 
+  0 metrics
+  1 traces
+    SQTT (
+      MASK = 0xf09
+      SE_MASK = 0x1
+      TOKEN_MASK = 0x344b
+      TOKEN_MASK2 = 0xffffffff
+    )
+Transformed:
+
+twiddles_create_pr 
+tableLength=12
+radices size = 5:
+	5
+	5
+	5
+	5
+	5
+
+gpu test
+Maximum error: 0
+
+ROCPRofiler: 2 contexts collected, output directory .//rpl_data_201119_033322_46331/input1_results_201119_033322
